@@ -31,8 +31,8 @@ train_depth <- function(data, n_halfspace, subsample = 1, scope = 1, seed) {
     random_mid <- select_halfspace(projection, scope)
     
     # Get mass distribution
-    mass_upper <- get_mass(projection, random_mid, subsample, "upper")
-    mass_lower <- get_mass(projection, random_mid, subsample, "lower")
+    mass_upper <- get_mass(projection, random_mid, "upper")
+    mass_lower <- get_mass(projection, random_mid, "lower")
     
     halfspaces[[i]] <- list(direction = random_direction, 
                             middle = random_mid, 
@@ -79,11 +79,12 @@ select_halfspace <- function(projection, scope) {
 }
 
 # get proportion on mass higher and lower then random middle
-get_mass <- function(projection, random_mid, subsample,  mass= c("upper", "lower")) {
+get_mass <- function(projection, random_mid, mass= c("upper", "lower")) {
   
-  # how many objects are projected upper respectively lower to the mid choosen
-  if (mass == "upper") sum(projection >= random_mid) / subsample
-  else sum(projection < random_mid) / subsample
+  # how many percent of all objects are projected upper respectively 
+  # lower to the mid choosen
+  if (mass == "upper") sum(projection >= random_mid) / nrow(projection)
+  else sum(projection < random_mid) / nrow(projection)
   
 }
 
@@ -104,37 +105,33 @@ get_mass <- function(projection, random_mid, subsample,  mass= c("upper", "lower
 
 evaluate_depth <- function(data, halfspaces, metric = c("mass", "depth")) {
   
-  halfspacemass <- data.frame(matrix(data = 0, nrow = nrow(data), ncol = 1))
   data_matrix <- as.matrix(data)
   
-  for (i in 1:length(halfspaces)) {
-    # project direction onto data 
-    direction <- halfspaces[[i]][["direction"]]
-    data_projected <- data %*% direction 
-    
-    # get halspace values
-    halfspacemass <- add_mass(data_projected, halfspaces[[i]], halfspacemass, metric)
-    
-    }
-  colnames(halfspacemass) = "depth"
-  halfspacemass / length(halfspaces)
+  halfspace_matrix <- sapply(1:length(halfspaces), FUN = add_mass,
+                             data_matrix = data_matrix,
+                             halfspaces = halfspaces)
+  
+  # Early Exit if halfspaces measured by mass (mean)
+  if (metric == "mass") return(rowMeans(halfspace_matrix))
+  # Otherwise return the minimum and rank it 
+  halfspace_depth <- apply(halfspace_matrix, 1, FUN = min)
+  match(halfspace_depth, unique(halfspace_depth)) - 1
   
 }
 
 
-add_mass <- function(data_projected, halfspaces, halfspacemass, metric) {
-  smaller <- vector()
-  
-  # get all index for projections smaller than mid-indicator
-  if (metric == "mass") smaller <- which(data_projected < halfspaces[["middle"]])
-  else smaller <- which(data_projected < halfspaces[["lower"]])
-  
-  
-  
-  # recursivly add value to halfspacemass
-  halfspacemass[smaller,] <- halfspacemass[smaller,] + halfspaces[["lower"]]
-  halfspacemass[-smaller,] <- halfspacemass[-smaller,] + halfspaces[["upper"]]
-  
-  halfspacemass
+add_mass <- function(x, data_matrix, halfspaces) {
 
+  # project direction onto data 
+  direction <- halfspaces[[x]][["direction"]]
+  data_projected <- data_matrix %*% direction 
+  halfspace_x <- vector(mode = "numeric", length = nrow(data_projected))
+  
+  # get halfspace values
+  lower <- which(data_projected < halfspaces[[x]][["middle"]])
+  halfspace_x[lower] <-  halfspaces[[x]][["lower"]]
+  halfspace_x[-lower] <-  halfspaces[[x]][["upper"]]
+
+  halfspace_x
 }
+

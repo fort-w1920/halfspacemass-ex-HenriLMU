@@ -128,6 +128,7 @@ plot_depth <- function(halfspaces, data, grid = NULL, points = TRUE,
 ```
 Check Figure 3:
 ```{r, vis-hsm-fig3, fig.width = 8, fig.height = 4, out.width = ".6\\textwidth"}
+source("topdown-halfspacemass-pseudocode.R")
 library(gridExtra)
 data_fig3 <- data.frame(z1 = c(-2, -.5, .5, 2), z2 = 0)
 grid_fig3 <- expand.grid(z1 = seq(-3, 3, l = 51), 
@@ -139,6 +140,7 @@ depth_fig3 <- train_depth(data_fig3, n_halfspace = 1e4,
 depth_fig3_scope15 <- train_depth(data_fig3,
                                n_halfspace = 1e3, scope = 1.5,
                                seed = 4163)
+
 gridExtra::grid.arrange(
   plot_depth(depth_fig3_scope15,
              data = data_fig3, grid = grid_fig3,

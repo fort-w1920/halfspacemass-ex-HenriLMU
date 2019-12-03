@@ -1,14 +1,19 @@
 #### Algorithmus 1: train_depth ################################################
 #
 # train_depth(data, n_halfspace, subsample, scope, seed):
-  # data enthält die Trainingsdaten (zi,i=1,…,n, in der obigen Notation)
-  # n_halfspace ist die Anzahl gezogener Halbräume (Notation im Paper: t)
-  # subsample ist der Anteil der Daten der zur Berechnung für jeden Halbraum 
-  # zufällig gezogen werden soll (im Paper: =ψ|D|, default sollte 1 sein)
-  # scope ist im Paper λ (default sollte 1 sein)
-  # seed für den RNG
+# data enthält die Trainingsdaten (zi,i=1,…,n, in der obigen Notation)
+# n_halfspace ist die Anzahl gezogener Halbräume (Notation im Paper: t)
+# subsample ist der Anteil der Daten der zur Berechnung für jeden Halbraum 
+# zufällig gezogen werden soll (im Paper: =ψ|D|, default sollte 1 sein)
+# scope ist im Paper λ (default sollte 1 sein)
+# seed für den RNG
 train_depth <- function(data, n_halfspace, subsample = 1, scope = 1, seed) {
+  
+  checkmate::assert_numeric(subsample, lower = 0, upper = 1, len = 1)
+  data <- as.matrix(data)
   set.seed(seed)
+  
+  halfspaces <- list()
   
   for (i in seq_len(n_halfspace)) {
     # generate random direction in dataspace
@@ -23,28 +28,40 @@ train_depth <- function(data, n_halfspace, subsample = 1, scope = 1, seed) {
     projection <- project_on_direction(random_direction, random_sample)
     
     # select halfspace indicator
-    halfspace <- select_halfspace(projection, scope)
+    random_mid <- select_halfspace(projection, scope)
     
     # Get mass distribution
-    mass_upper <- get_mass(projection, "upper")
-    mass_lower <- 1 - mass_upper
+    mass_upper <- get_mass(projection, random_mid, subsample, "upper")
+    mass_lower <- get_mass(projection, random_mid, subsample, "lower")
     
-
+    halfspaces[[i]] <- list(direction = random_direction, 
+                            middle = random_mid, 
+                            upper = mass_upper, lower = mass_lower)
   }
+  
+  halfspaces
 }
 
-
+# get a direction in n-dimensional space
 get_direction <- function(data_dim) {
   # get norm ditributed direction
-  norm_dir <- rnorm(data_dim)
+  standard_dir <- rnorm(data_dim)
   # standardize direction
-  standard_dir <- sqrt(norm_direction ^ 2)
+  standard_dir <- standard_dir / max(abs(standard_dir))
+  #standard_dir <- 
   
-  standard_dir
+  as.matrix(standard_dir)
 }
 
+# project ndmensional space on 1D number
+project_on_direction <- function(random_direction, random_sample) {
+  
+  dot_prod <- random_sample %*% random_direction
+  
+  dot_prod
+}
 
-
+# Select number that represents the halfspace
 select_halfspace <- function(projection, scope) {
   # get locations for min max and mid of projection
   min = min(projection)
@@ -55,12 +72,20 @@ select_halfspace <- function(projection, scope) {
   # get intevall for halfspace
   halfspace_range <- c(mid + half_range, mid - half_range)
   
-  # get halfspace
-  halfspace <- runif(1, min = halfspace_range[2], max = halfspace_range[1])
+  # get random middle
+  random_mid <- runif(1, min = halfspace_range[2], max = halfspace_range[1])
   
-  halfspace
+  random_mid
 }
 
+# get proportion on mass higher and lower then random middle
+get_mass <- function(projection, random_mid, subsample,  mass= c("upper", "lower")) {
+  
+  # how many objects are projected upper respectively lower to the mid choosen
+  if (mass == "upper") sum(projection >= random_mid) / subsample
+  else sum(projection < random_mid) / subsample
+  
+}
 
 
 #### Algorithmus 2: evaluate_depth #############################################
@@ -69,6 +94,47 @@ select_halfspace <- function(projection, scope) {
 # evaluate_depth() berechnet für jeden Punkt x in data die halfspace mass auf 
 # Basis der von train_depth zurückgegeben halfspaces, also
 # 
-# data enthält die Test- bzw. Validierungsdaten (x, in der obigen Notation), deren Tiefe bezüglich der im zweiten Argument definierten Halbräume bestimmt werden soll.
-# halfspaces ist das von train_depth zurückgelieferte Objekt. Wie Sie das genau strukturieren bleibt Ihnen überlassen (und will wohlüberlegt sein).
-# Ihre Funktionen sollen auch für höherdimensionale x,zi∈Rd mit beliebigem d>2 funktionieren. Das macht vor allem das korrekte zufällige Ziehen der Halbräume evtl. etwas schwieriger.
+# data enthält die Test- bzw. Validierungsdaten (x, in der obigen Notation)
+# , deren Tiefe bezüglich der im zweiten Argument definierten Halbräume bestimmt werden soll.
+# halfspaces ist das von train_depth zurückgelieferte Objekt. 
+# Wie Sie das genau strukturieren bleibt Ihnen überlassen (und will wohlüberlegt sein).
+# Ihre Funktionen sollen auch für höherdimensionale x,zi∈Rd mit beliebigem d>2 funktionieren.
+# Das macht vor allem das korrekte zufällige Ziehen der Halbräume evtl. etwas schwieriger.
+
+
+evaluate_depth <- function(data, halfspaces, metric = c("mass", "depth")) {
+  
+  halfspacemass <- data.frame(matrix(data = 0, nrow = nrow(data), ncol = 1))
+  data_matrix <- as.matrix(data)
+  
+  for (i in 1:length(halfspaces)) {
+    # project direction onto data 
+    direction <- halfspaces[[i]][["direction"]]
+    data_projected <- data %*% direction 
+    
+    # get halspace values
+    halfspacemass <- add_mass(data_projected, halfspaces[[i]], halfspacemass, metric)
+    
+    }
+  colnames(halfspacemass) = "depth"
+  halfspacemass / length(halfspaces)
+  
+}
+
+
+add_mass <- function(data_projected, halfspaces, halfspacemass, metric) {
+  smaller <- vector()
+  
+  # get all index for projections smaller than mid-indicator
+  if (metric == "mass") smaller <- which(data_projected < halfspaces[["middle"]])
+  else smaller <- which(data_projected < halfspaces[["lower"]])
+  
+  
+  
+  # recursivly add value to halfspacemass
+  halfspacemass[smaller,] <- halfspacemass[smaller,] + halfspaces[["lower"]]
+  halfspacemass[-smaller,] <- halfspacemass[-smaller,] + halfspaces[["upper"]]
+  
+  halfspacemass
+
+}

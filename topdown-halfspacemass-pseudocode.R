@@ -113,7 +113,7 @@ evaluate_depth <- function(data, halfspaces, metric = c("mass", "depth")) {
   
   # Early Exit if halfspaces measured by mass (mean)
   if (metric == "mass") return(rowMeans(halfspace_matrix))
-  # Otherwise return the minimum and rank it 
+  # Otherwise return the ranked minimum
   halfspace_depth <- apply(halfspace_matrix, 1, FUN = min)
   match(halfspace_depth, unique(halfspace_depth)) - 1
   

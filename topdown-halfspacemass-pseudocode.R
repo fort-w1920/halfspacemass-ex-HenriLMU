@@ -12,8 +12,6 @@ train_depth <- function(data, n_halfspace,
                         seed = 4163) {
   
   checkmate::assert_numeric(subsample, lower = 0, upper = 1, len = 1)
-  checkmate::assert_integer(seed, lower = 1, len = 1)
-  checkmate::assert_integer(n_halfspace, lower = 1, len = 1)
   data <- as.matrix(data)
   set.seed(seed)
   

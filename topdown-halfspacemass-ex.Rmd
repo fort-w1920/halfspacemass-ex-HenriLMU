@@ -74,8 +74,8 @@ Gehen Sie bei der Implementierung unbedingt nach den in der Vorlesung besprochen
 sinnvolle Kommentare an komplizierte Stellen und überprüfen Sie während der Entwicklung sorgfältig die Teilschritte ihrer Implementation mit (einfachen) Tests deren korrektes Ergebnis sie sicher kennen.
 
 Eine erfolgreiche Lösung sollte dann in etwa folgende Ergebnisse liefern:
-```{r, hsm-def, code = readLines("topdown-halfspacemass-def.R"), echo = FALSE}
-```
+#```{r, hsm-def, code = readLines("topdown-halfspacemass-def.R"), echo = FALSE}
+#```
 
 ```{r, vis-hsm-prep}
 library(ggplot2)

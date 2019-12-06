@@ -7,9 +7,13 @@
 # zufällig gezogen werden soll (im Paper: =ψ|D|, default sollte 1 sein)
 # scope ist im Paper λ (default sollte 1 sein)
 # seed für den RNG
-train_depth <- function(data, n_halfspace, subsample = 1, scope = 1, seed) {
+train_depth <- function(data, n_halfspace, 
+                        subsample = 1, scope = 1,
+                        seed = 4163) {
   
   checkmate::assert_numeric(subsample, lower = 0, upper = 1, len = 1)
+  checkmate::assert_integer(seed, lower = 1, len = 1)
+  checkmate::assert_integer(n_halfspace, lower = 1, len = 1)
   data <- as.matrix(data)
   set.seed(seed)
   
@@ -24,7 +28,7 @@ train_depth <- function(data, n_halfspace, subsample = 1, scope = 1, seed) {
     random_observation <- sample(nrow(data), size = subsample*nrow(data))
     random_sample <- data[random_observation,]
     
-    # project Subsample on direction
+    # project Subsample on direction; reduction in 1 dim
     projection <- project_on_direction(random_direction, random_sample)
     
     # select halfspace indicator
@@ -33,6 +37,7 @@ train_depth <- function(data, n_halfspace, subsample = 1, scope = 1, seed) {
     # Get mass distribution
     mass_upper <- get_mass(projection, random_mid, "upper")
     mass_lower <- get_mass(projection, random_mid, "lower")
+    
     
     halfspaces[[i]] <- list(direction = random_direction, 
                             middle = random_mid, 
@@ -46,10 +51,6 @@ train_depth <- function(data, n_halfspace, subsample = 1, scope = 1, seed) {
 get_direction <- function(data_dim) {
   # get norm ditributed direction
   standard_dir <- rnorm(data_dim)
-  # standardize direction
-  standard_dir <- standard_dir / max(abs(standard_dir))
-  #standard_dir <- 
-  
   as.matrix(standard_dir)
 }
 
@@ -107,21 +108,25 @@ evaluate_depth <- function(data, halfspaces, metric = c("mass", "depth")) {
   
   data_matrix <- as.matrix(data)
   
+  # get a matrix with the projection of each iteration (cols)
+  #                                  on each object of the data (rows)
   halfspace_matrix <- sapply(1:length(halfspaces), FUN = add_mass,
                              data_matrix = data_matrix,
                              halfspaces = halfspaces)
   
   # Early Exit if halfspaces measured by mass (mean)
   if (metric == "mass") return(rowMeans(halfspace_matrix))
-  # Otherwise return the ranked minimum
+  
+  # Otherwise return the minimum
   halfspace_depth <- apply(halfspace_matrix, 1, FUN = min)
-  match(halfspace_depth, unique(halfspace_depth)) - 1
+  halfspace_depth
+  # match(halfspace_depth, unique(halfspace_depth)) - 1
   
 }
 
 
 add_mass <- function(x, data_matrix, halfspaces) {
-
+  
   # project direction onto data 
   direction <- halfspaces[[x]][["direction"]]
   data_projected <- data_matrix %*% direction 
@@ -131,7 +136,7 @@ add_mass <- function(x, data_matrix, halfspaces) {
   lower <- which(data_projected < halfspaces[[x]][["middle"]])
   halfspace_x[lower] <-  halfspaces[[x]][["lower"]]
   halfspace_x[-lower] <-  halfspaces[[x]][["upper"]]
-
+  
   halfspace_x
 }
 
